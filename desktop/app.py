@@ -371,9 +371,27 @@ def main(page: ft.Page):
     photo_path = ft.Text("")
     photo_preview = ft.Image(src="", width=220, height=140, fit="contain", visible=False)
     def pick_photo(e):
-        if not file_picker:
+        if file_picker:
+            file_picker.pick_files(allow_multiple=False)
             return
-        file_picker.pick_files(allow_multiple=False)
+        # Windows fallback: tkinter file dialog
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            path = filedialog.askopenfilename(
+                title="Fotoğraf Seç",
+                filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.webp;*.bmp"), ("All files", "*.*")]
+            )
+            root.destroy()
+            if path:
+                photo_path.value = path
+                photo_preview.src = path
+                photo_preview.visible = True
+                page.update()
+        except Exception as ex:
+            print("TK_FILEPICKER_ERR:", ex)
 
     def _on_photo_result(e):
         if e.files:
@@ -390,7 +408,7 @@ def main(page: ft.Page):
     if file_picker:
         file_picker.on_result = _on_photo_result
 
-    photo_btn = ft.OutlinedButton("Foto Seç", on_click=pick_photo, disabled=not supports_file_picker)
+    photo_btn = ft.OutlinedButton("Foto Seç", on_click=pick_photo)
 
     save_btn = ft.ElevatedButton("Kaydet", on_click=save_order)
     sync_btn = ft.OutlinedButton("Senkronla", on_click=lambda e: (try_sync(), refresh_kpis(), refresh_table()))
