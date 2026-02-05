@@ -46,7 +46,8 @@ def build_daily_pdf(report_date: str, summary: dict, rows: list[dict]) -> str:
 def build_range_pdf(start_day: str, end_day: str, summary: dict, rows: list, title: str = "Satis Raporu"):
     base_dir = _reports_dir()
     os.makedirs(base_dir, exist_ok=True)
-    path = os.path.join(base_dir, f"range_{start_day}_to_{end_day}.pdf")
+    filename = f"range_{start_day}_to_{end_day}.pdf"
+    path = os.path.join(base_dir, filename)
     c = canvas.Canvas(path, pagesize=A4)
     w, h = A4
 
@@ -120,4 +121,5 @@ def build_range_pdf(start_day: str, end_day: str, summary: dict, rows: list, tit
         y -= 18
 
     c.save()
-    return path
+    # API'ye relative dosya adı dönüyoruz; istemci /report-files/<filename> ile açacak
+    return filename
