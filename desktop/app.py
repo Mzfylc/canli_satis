@@ -10,6 +10,7 @@ import requests
 import uuid
 import subprocess
 import os
+import webbrowser
 import threading
 import sys
 import time
@@ -302,22 +303,11 @@ def main(page: ft.Page):
         refresh_table()
 
     def run_report(path):
-        # server tarafındaki reports klasörünü aç (aynı makine varsayımı)
+        # Raporu API üzerinden aç (uzak sunucu için güvenli)
         try:
-            if getattr(sys, "frozen", False):
-                base_dir = os.path.dirname(sys.executable)
-            else:
-                base_dir = os.path.dirname(os.path.abspath(__file__))
-
-            repo_root = os.path.abspath(os.path.join(base_dir, "..", "..", ".."))
-            report_path = os.path.abspath(os.path.join(repo_root, "server", path))
-
-            if platform.system().lower() == "windows":
-                os.startfile(report_path)  # type: ignore[attr-defined]
-            elif platform.system().lower() == "darwin":
-                subprocess.Popen(["open", report_path])
-            else:
-                subprocess.Popen(["xdg-open", report_path])
+            base = api_base.value.strip().rstrip("/")
+            url = f"{base}/{path.lstrip('/')}"
+            webbrowser.open(url)
         except Exception as ex:
             print("OPEN_REPORT_ERR:", ex)
 
