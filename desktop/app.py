@@ -13,6 +13,7 @@ import os
 import threading
 import time
 import shutil
+import platform
 from datetime import datetime
 
 from local_db import init_db, add_order, list_orders, pending_sync, mark_synced, count_unsynced, update_status_local, APP_DIR, DB_PATH
@@ -29,8 +30,16 @@ LABEL_STATUS = {v: k for k, v in STATUS_LABEL.items()}
 
 def main(page: ft.Page):
 
-    file_picker = ft.FilePicker()
-    page.overlay.append(file_picker)
+    # Windows paketinde FilePicker desteklenmeyebilir; güvenli fallback
+    supports_file_picker = platform.system().lower() != "windows"
+    file_picker = None
+    if supports_file_picker:
+        try:
+            file_picker = ft.FilePicker()
+            page.overlay.append(file_picker)
+        except Exception:
+            file_picker = None
+            supports_file_picker = False
 
     page.title = "Canli Satis - Siparis"
     page.window_width = 1200
@@ -346,6 +355,8 @@ def main(page: ft.Page):
     photo_path = ft.Text("")
     photo_preview = ft.Image(src="", width=220, height=140, fit="contain", visible=False)
     def pick_photo(e):
+        if not file_picker:
+            return
         file_picker.pick_files(allow_multiple=False)
 
     def _on_photo_result(e):
@@ -360,9 +371,10 @@ def main(page: ft.Page):
             photo_preview.visible = False
         page.update()
 
-    file_picker.on_result = _on_photo_result
+    if file_picker:
+        file_picker.on_result = _on_photo_result
 
-    photo_btn = ft.OutlinedButton("Foto Seç", on_click=pick_photo)
+    photo_btn = ft.OutlinedButton("Foto Seç", on_click=pick_photo, disabled=not supports_file_picker)
 
     save_btn = ft.ElevatedButton("Kaydet", on_click=save_order)
     sync_btn = ft.OutlinedButton("Senkronla", on_click=lambda e: (try_sync(), refresh_kpis(), refresh_table()))
