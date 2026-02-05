@@ -48,7 +48,12 @@ def main(page: ft.Page):
 
     init_db()
 
-    api_base = ft.TextField(label="API Base", value="http://127.0.0.1:8000", width=360)
+    api_base = ft.TextField(
+        label="API Base",
+        value="http://51.195.25.69:8000",
+        width=360,
+        read_only=True,
+    )
     email = ft.TextField(label="E-posta", value="admin@firma.com", width=240)
     password = ft.TextField(label="Şifre", value="123456", password=True, can_reveal_password=True, width=200)
 
