@@ -136,7 +136,7 @@ def main(page: ft.Page):
     def refresh_table():
         def _photo_cell(path: str):
             if path:
-                return ft.DataCell(ft.Image(src=path, width=60, height=40, fit=ft.ImageFit.CONTAIN))
+                return ft.DataCell(ft.Image(src=path, width=60, height=40, fit="contain"))
             return ft.DataCell(ft.Text("-"))
 
         rows = list_orders(300)
@@ -344,7 +344,7 @@ def main(page: ft.Page):
 
     login_btn = ft.ElevatedButton("Buluta Bağlan", on_click=do_login)
     photo_path = ft.Text("")
-    photo_preview = ft.Image(width=220, height=140, fit=ft.ImageFit.CONTAIN, visible=False)
+    photo_preview = ft.Image(width=220, height=140, fit="contain", visible=False)
     def pick_photo(e):
         file_picker.pick_files(allow_multiple=False)
 
