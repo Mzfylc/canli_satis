@@ -1,0 +1,169 @@
+import flet as ft
+import requests
+import uuid
+from local_db import init_db, add_order, list_orders, pending_sync, mark_synced, count_unsynced
+from sync import login, push_one
+
+CLIENT_ID = str(uuid.uuid4())
+
+def main(page: ft.Page):
+    page.title = "Canli Satis - Siparis"
+    page.window_width = 1100
+    page.window_height = 750
+
+    init_db()
+
+    api_base = ft.TextField(label="API Base", value="http://127.0.0.1:8000", width=360)
+    email = ft.TextField(label="E-posta", value="admin@firma.com", width=240)
+    password = ft.TextField(label="Sifre", value="123456", password=True, can_reveal_password=True, width=200)
+
+    token_text = ft.Text("Bulut: Bagli degil", color="red")
+    unsynced_text = ft.Text("")
+    token_holder = {"token": None}
+
+    full_name = ft.TextField(label="Isim Soyisim", width=250)
+    phone = ft.TextField(label="Telefon", width=160)
+    product = ft.TextField(label="Urun", width=260)
+    price = ft.TextField(label="Fiyat", width=120)
+
+    status = ft.Dropdown(
+        label="Durum",
+        width=160,
+        options=[
+            ft.dropdown.Option("pending", "Bekliyor"),
+            ft.dropdown.Option("paid", "Odendi"),
+            ft.dropdown.Option("cancelled", "Iptal"),
+        ],
+        value="pending",
+    )
+
+    note = ft.TextField(label="Not", width=450)
+
+    table = ft.DataTable(
+        columns=[
+            ft.DataColumn(ft.Text("Tarih")),
+            ft.DataColumn(ft.Text("Isim")),
+            ft.DataColumn(ft.Text("Telefon")),
+            ft.DataColumn(ft.Text("Urun")),
+            ft.DataColumn(ft.Text("Fiyat")),
+            ft.DataColumn(ft.Text("Durum")),
+            ft.DataColumn(ft.Text("Sync")),
+        ],
+        rows=[],
+    )
+
+    def refresh_table():
+        rows = list_orders(200)
+        table.rows.clear()
+        for r in rows:
+            table.rows.append(
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text(r["created_at"])),
+                        ft.DataCell(ft.Text(r["full_name"])),
+                        ft.DataCell(ft.Text(r["phone"])),
+                        ft.DataCell(ft.Text(r["product"])),
+                        ft.DataCell(ft.Text(f"{r['price']:.2f}")),
+                        ft.DataCell(ft.Text(r["status"])),
+                        ft.DataCell(ft.Text("✅" if r["synced"] else "⏳")),
+                    ]
+                )
+            )
+
+        uns = count_unsynced()
+        unsynced_text.value = f"Bekleyen senkron: {uns}"
+        unsynced_text.color = "green" if uns == 0 else "orange"
+        page.update()
+
+    def do_login(e):
+        try:
+            tok = login(api_base.value.strip(), email.value.strip(), password.value)
+            token_holder["token"] = tok
+            token_text.value = "Bulut: Bagli ✅"
+            token_text.color = "green"
+        except Exception as ex:
+            token_holder["token"] = None
+            token_text.value = f"Baglanti hatasi"
+            token_text.color = "red"
+        refresh_table()
+
+    def try_sync():
+        tok = token_holder["token"]
+        if not tok:
+            return
+        for r in pending_sync():
+            try:
+                push_one(api_base.value.strip(), tok, r)
+                mark_synced(r["id"])
+            except:
+                break
+
+    def save_order(e):
+        if not full_name.value or not phone.value or not product.value or not price.value:
+            page.snack_bar = ft.SnackBar(ft.Text("Zorunlu alanlar bos olamaz"), open=True)
+            page.update()
+            return
+
+        add_order(
+            {
+                "full_name": full_name.value.strip(),
+                "phone": phone.value.strip(),
+                "product": product.value.strip(),
+                "price": float(price.value.replace(",", ".")),
+                "status": status.value,
+                "note": note.value.strip(),
+                "client_id": CLIENT_ID,
+                "client_order_id": str(uuid.uuid4()),
+            }
+        )
+
+        full_name.value = ""
+        phone.value = ""
+        product.value = ""
+        price.value = ""
+        status.value = "pending"
+        note.value = ""
+
+        try_sync()
+        refresh_table()
+
+    def get_report(e):
+        tok = token_holder["token"]
+        if not tok:
+            page.snack_bar = ft.SnackBar(ft.Text("Once buluta baglan"), open=True)
+            page.update()
+            return
+        try:
+            r = requests.post(
+                api_base.value.strip() + "/reports/daily",
+                headers={"Authorization": f"Bearer {tok}"},
+                timeout=20,
+            )
+            j = r.json()
+            page.snack_bar = ft.SnackBar(
+                ft.Text(f"PDF hazir: {j['pdf']} | Adet:{j['count']} | Toplam:{j['total']}"),
+                open=True,
+            )
+        except Exception as ex:
+            page.snack_bar = ft.SnackBar(ft.Text("Rapor hatasi"), open=True)
+        page.update()
+
+    login_btn = ft.ElevatedButton("Buluta Baglan", on_click=do_login)
+    save_btn = ft.ElevatedButton("Kaydet", on_click=save_order)
+    sync_btn = ft.OutlinedButton("Senkronla", on_click=lambda e: (try_sync(), refresh_table()))
+    report_btn = ft.OutlinedButton("Gunluk PDF", on_click=get_report)
+
+    page.add(
+        ft.Row([api_base, email, password, login_btn, report_btn, token_text], wrap=True),
+        ft.Row([unsynced_text, sync_btn], wrap=True),
+        ft.Divider(),
+        ft.Row([full_name, phone, product, price, status, save_btn], wrap=True),
+        ft.Row([note], wrap=True),
+        ft.Divider(),
+        ft.Text("Son Kayitlar"),
+        ft.Container(table, expand=True),
+    )
+
+    refresh_table()
+
+ft.app(target=main)
