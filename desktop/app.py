@@ -93,6 +93,11 @@ def main(page: ft.Page):
     # Seçili kayıt için durum değiştirme
     selected_id = {"local_id": None}
     supports_row_select = platform.system().lower() != "windows"
+    manual_id = ft.TextField(
+        label="Kayıt ID (Windows)",
+        width=140,
+        visible=platform.system().lower() == "windows",
+    )
     edit_status = ft.Dropdown(
         label="Seçili Kayıt Durumu",
         width=220,
@@ -108,6 +113,7 @@ def main(page: ft.Page):
 
     table = ft.DataTable(
         columns=[
+            ft.DataColumn(ft.Text("ID")),
             ft.DataColumn(ft.Text("İsim")),
             ft.DataColumn(ft.Text("Ürün")),
             ft.DataColumn(ft.Text("Fiyat")),
@@ -172,6 +178,7 @@ def main(page: ft.Page):
         for r in rows:
             st = r["status"]
             cells = [
+                ft.DataCell(ft.Text(str(r["id"]))),
                 ft.DataCell(ft.Text(r["full_name"])),
                 ft.DataCell(ft.Text(r["product"])),
                 ft.DataCell(ft.Text(f"{r['price']:.2f}")),
@@ -281,6 +288,11 @@ def main(page: ft.Page):
 
     def update_selected_status(e):
         lid = selected_id["local_id"]
+        if not lid and manual_id.visible:
+            try:
+                lid = int((manual_id.value or "").strip())
+            except Exception:
+                lid = None
         if not lid:
             return
         new_status = edit_status.value
@@ -446,7 +458,7 @@ def main(page: ft.Page):
         photo_preview,
         ft.Divider(),
         ft.Text("Son Kayıtlar"),
-        ft.Row([ft.Text("Seçili Kayıt Durumu:"), edit_status, edit_btn], wrap=True),
+        ft.Row([ft.Text("Seçili Kayıt Durumu:"), edit_status, edit_btn, manual_id], wrap=True),
         ft.Container(table, expand=True),
     )
 

@@ -7,11 +7,17 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
 
 def _try_register_tr_font() -> str:
-    # MacOS'ta bulunan Türkçe destekli fontları dene
+    # Türkçe destekli fontları dene (macOS + Windows)
     candidates = [
+        # macOS
         "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
         "/System/Library/Fonts/Supplemental/Arial.ttf",
         "/System/Library/Fonts/Supplemental/Helvetica.ttf",
+        # Windows
+        "C:\\Windows\\Fonts\\arial.ttf",
+        "C:\\Windows\\Fonts\\arialuni.ttf",
+        "C:\\Windows\\Fonts\\calibri.ttf",
+        "C:\\Windows\\Fonts\\segoeui.ttf",
     ]
     for path in candidates:
         if os.path.exists(path):
