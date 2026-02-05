@@ -28,6 +28,10 @@ def _try_register_tr_font() -> str:
                 pass
     return "Helvetica"
 
+def _reports_dir() -> str:
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "reports"))
+
+
 def build_daily_pdf(report_date: str, summary: dict, rows: list[dict]) -> str:
     # Günlük raporu, aralık şablonuyla aynı görünümde üret
     return build_range_pdf(
@@ -40,8 +44,9 @@ def build_daily_pdf(report_date: str, summary: dict, rows: list[dict]) -> str:
 
 
 def build_range_pdf(start_day: str, end_day: str, summary: dict, rows: list, title: str = "Satis Raporu"):
-    os.makedirs("reports", exist_ok=True)
-    path = f"reports/range_{start_day}_to_{end_day}.pdf"
+    base_dir = _reports_dir()
+    os.makedirs(base_dir, exist_ok=True)
+    path = os.path.join(base_dir, f"range_{start_day}_to_{end_day}.pdf")
     c = canvas.Canvas(path, pagesize=A4)
     w, h = A4
 

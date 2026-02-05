@@ -4,6 +4,7 @@ import uuid
 from sqlalchemy import text
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
@@ -17,6 +18,11 @@ from .report import build_daily_pdf, build_range_pdf
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 app = FastAPI(title="Canli Satis API")
+
+# PDF raporlarını servis et (mutlak yol)
+REPORTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "reports"))
+os.makedirs(REPORTS_DIR, exist_ok=True)
+app.mount("/reports", StaticFiles(directory=REPORTS_DIR), name="reports")
 
 @app.on_event("startup")
 def startup():
