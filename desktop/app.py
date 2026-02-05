@@ -107,9 +107,9 @@ def main(page: ft.Page):
             ft.dropdown.Option("cancelled", "İptal"),
         ],
         value="pending",
-        disabled=not supports_row_select,
+        disabled=False,
     )
-    edit_btn = ft.ElevatedButton("Durumu Güncelle", disabled=not supports_row_select)
+    edit_btn = ft.ElevatedButton("Durumu Güncelle", disabled=False)
 
     table = ft.DataTable(
         columns=[
