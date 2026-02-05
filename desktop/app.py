@@ -84,6 +84,7 @@ def main(page: ft.Page):
 
     # Seçili kayıt için durum değiştirme
     selected_id = {"local_id": None}
+    supports_row_select = platform.system().lower() != "windows"
     edit_status = ft.Dropdown(
         label="Seçili Kayıt Durumu",
         width=220,
@@ -93,8 +94,9 @@ def main(page: ft.Page):
             ft.dropdown.Option("cancelled", "İptal"),
         ],
         value="pending",
+        disabled=not supports_row_select,
     )
-    edit_btn = ft.ElevatedButton("Durumu Güncelle", disabled=True)
+    edit_btn = ft.ElevatedButton("Durumu Güncelle", disabled=not supports_row_select)
 
     table = ft.DataTable(
         columns=[
@@ -161,21 +163,21 @@ def main(page: ft.Page):
 
         for r in rows:
             st = r["status"]
-            table.rows.append(
-                ft.DataRow(
-                    on_select_changed=on_row_select(r["id"], st),
-                    cells=[
-                        ft.DataCell(ft.Text(r["full_name"])),
-                        ft.DataCell(ft.Text(r["product"])),
-                        ft.DataCell(ft.Text(f"{r['price']:.2f}")),
-                        ft.DataCell(ft.Text(r["phone"] or "")),
-                        _photo_cell(r.get("photo_path") or ""),
-                        ft.DataCell(ft.Text(STATUS_LABEL.get(st, st))),
-                        ft.DataCell(ft.Text("✅" if r["synced"] else "⏳")),
-                        ft.DataCell(ft.Text(r["created_at"])),
-                    ],
-                )
-            )
+            cells = [
+                ft.DataCell(ft.Text(r["full_name"])),
+                ft.DataCell(ft.Text(r["product"])),
+                ft.DataCell(ft.Text(f"{r['price']:.2f}")),
+                ft.DataCell(ft.Text(r["phone"] or "")),
+                _photo_cell(r.get("photo_path") or ""),
+                ft.DataCell(ft.Text(STATUS_LABEL.get(st, st))),
+                ft.DataCell(ft.Text("✅" if r["synced"] else "⏳")),
+                ft.DataCell(ft.Text(r["created_at"])),
+            ]
+            if supports_row_select:
+                row = ft.DataRow(on_select_changed=on_row_select(r["id"], st), cells=cells)
+            else:
+                row = ft.DataRow(cells=cells)
+            table.rows.append(row)
 
         uns = count_unsynced()
         unsynced_text.value = f"Bekleyen senkron: {uns}"
