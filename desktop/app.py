@@ -45,6 +45,8 @@ def main(page: ft.Page):
     page.title = "Canli Satis - Siparis"
     page.window_width = 1200
     page.window_height = 780
+    page.window_resizable = True
+    page.scroll = ft.ScrollMode.AUTO
 
     init_db()
 
@@ -385,7 +387,15 @@ def main(page: ft.Page):
             from tkinter import filedialog
             root = tk.Tk()
             root.withdraw()
+            try:
+                root.attributes("-topmost", True)
+                root.lift()
+                root.focus_force()
+                root.update()
+            except Exception:
+                pass
             path = filedialog.askopenfilename(
+                parent=root,
                 title="Fotoğraf Seç",
                 filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.webp;*.bmp"), ("All files", "*.*")]
             )
