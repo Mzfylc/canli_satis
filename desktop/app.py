@@ -11,6 +11,7 @@ import uuid
 import subprocess
 import os
 import threading
+import sys
 import time
 import shutil
 import platform
@@ -282,11 +283,24 @@ def main(page: ft.Page):
         refresh_table()
 
     def run_report(path):
-        # server tarafındaki reports klasörünü aç (şimdilik aynı makine)
+        # server tarafındaki reports klasörünü aç (aynı makine varsayımı)
         try:
-            subprocess.Popen(["open", os.path.expanduser("~/canli_satis_mvp/server/") + path])
-        except:
-            pass
+            if getattr(sys, "frozen", False):
+                base_dir = os.path.dirname(sys.executable)
+            else:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+
+            repo_root = os.path.abspath(os.path.join(base_dir, "..", "..", ".."))
+            report_path = os.path.abspath(os.path.join(repo_root, "server", path))
+
+            if platform.system().lower() == "windows":
+                os.startfile(report_path)  # type: ignore[attr-defined]
+            elif platform.system().lower() == "darwin":
+                subprocess.Popen(["open", report_path])
+            else:
+                subprocess.Popen(["xdg-open", report_path])
+        except Exception as ex:
+            print("OPEN_REPORT_ERR:", ex)
 
     def report_daily(e):
         tok = token_holder["token"]
