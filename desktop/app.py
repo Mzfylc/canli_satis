@@ -306,7 +306,7 @@ def main(page: ft.Page):
         # Raporu API üzerinden aç (uzak sunucu için güvenli)
         try:
             base = api_base.value.strip().rstrip("/")
-            url = f"{base}/{path.lstrip('/')}"
+            url = f"{base}/report-files/{path.lstrip('/')}"
             webbrowser.open(url)
         except Exception as ex:
             print("OPEN_REPORT_ERR:", ex)

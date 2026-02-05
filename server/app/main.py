@@ -22,7 +22,8 @@ app = FastAPI(title="Canli Satis API")
 # PDF raporlarını servis et (mutlak yol)
 REPORTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "reports"))
 os.makedirs(REPORTS_DIR, exist_ok=True)
-app.mount("/reports", StaticFiles(directory=REPORTS_DIR), name="reports")
+# Not: /reports endpoint'leri POST kullandığı için statik servis farklı bir yol olmalı
+app.mount("/report-files", StaticFiles(directory=REPORTS_DIR), name="report-files")
 
 @app.on_event("startup")
 def startup():
