@@ -16,6 +16,7 @@ import sys
 import time
 import shutil
 import platform
+from urllib.parse import quote
 from datetime import timedelta
 from datetime import datetime
 
@@ -106,6 +107,16 @@ def main(page: ft.Page):
         on_change=lambda e: refresh_table(),
     )
 
+    view_dd = ft.Dropdown(
+        label="Görünüm",
+        width=160,
+        options=[
+            ft.dropdown.Option("today", "Bugün"),
+            ft.dropdown.Option("history", "Geçmiş Tarih"),
+        ],
+        value="today",
+        on_change=lambda e: refresh_table(),
+    )
     history_date = ft.TextField(label="Geçmiş Tarih (YYYY-AA-GG)", width=190, on_change=lambda e: refresh_table())
     search_text = ft.TextField(label="Ara (isim/ürün/telefon)", width=260, on_change=lambda e: refresh_table())
 
@@ -170,6 +181,7 @@ def main(page: ft.Page):
             ft.DataColumn(ft.Text("Durum")),
             ft.DataColumn(ft.Text("Sync")),
             ft.DataColumn(ft.Text("Tarih")),
+            ft.DataColumn(ft.Text("WhatsApp")),
         ],
         rows=[],
     )
@@ -212,11 +224,40 @@ def main(page: ft.Page):
                 return ft.DataCell(ft.Image(src=path, width=60, height=40, fit="contain"))
             return ft.DataCell(ft.Text("-"))
 
-        active_tab = tabs.selected_index if tabs else 0
+        def _normalize_phone(p: str) -> str:
+            digits = "".join([c for c in (p or "") if c.isdigit()])
+            if digits.startswith("00"):
+                digits = digits[2:]
+            if digits.startswith("0"):
+                digits = "90" + digits[1:]
+            if not digits.startswith("90"):
+                digits = "90" + digits
+            return digits
+
+        def _whatsapp_button(name: str, phone: str, price: float, created_at: str):
+            msg = f"Merhaba {name}, {created_at[:10]} tarihli {price:.2f} TL ödemeniz beklemede."
+            url = f"https://wa.me/{_normalize_phone(phone)}?text={quote(msg)}"
+            return ft.DataCell(
+                ft.IconButton(
+                    icon=ft.icons.MESSAGE,
+                    tooltip="WhatsApp",
+                    on_click=lambda e: webbrowser.open(url),
+                )
+            )
+
+        def _is_overdue(status: str, created_at: str) -> bool:
+            if status != "pending":
+                return False
+            try:
+                dt = datetime.fromisoformat(created_at.replace("Z", ""))
+                return (datetime.now() - dt) >= timedelta(days=3)
+            except Exception:
+                return False
+
         date_filter = None
-        if active_tab == 0:
+        if view_dd.value == "today":
             date_filter = datetime.now().strftime("%Y-%m-%d")
-        else:
+        elif view_dd.value == "history":
             date_filter = (history_date.value or "").strip() or None
 
         rows = list_orders_filtered(300, date_filter, sort_dd.value, (search_text.value or "").strip())
@@ -242,11 +283,19 @@ def main(page: ft.Page):
                 ft.DataCell(ft.Text(STATUS_LABEL.get(st, st))),
                 ft.DataCell(ft.Text("✅" if r["synced"] else "⏳")),
                 ft.DataCell(ft.Text(r["created_at"])),
+                _whatsapp_button(r["full_name"], r.get("phone",""), float(r["price"]), r["created_at"]),
             ]
             if supports_row_select:
-                row = ft.DataRow(on_select_changed=on_row_select(r["id"], st), cells=cells)
+                row = ft.DataRow(
+                    on_select_changed=on_row_select(r["id"], st),
+                    cells=cells,
+                    color=ft.colors.RED_50 if _is_overdue(st, r["created_at"]) else None,
+                )
             else:
-                row = ft.DataRow(cells=cells)
+                row = ft.DataRow(
+                    cells=cells,
+                    color=ft.colors.RED_50 if _is_overdue(st, r["created_at"]) else None,
+                )
             table.rows.append(row)
 
         uns = count_unsynced()
@@ -490,15 +539,6 @@ def main(page: ft.Page):
     monthly_btn = ft.OutlinedButton("Aylık PDF", on_click=report_monthly)
     range_btn = ft.OutlinedButton("Aralık PDF", on_click=report_range)
 
-    tabs = ft.Tabs(
-        selected_index=0,
-        tabs=[
-            ft.Tab(text="Bugün"),
-            ft.Tab(text="Geçmiş"),
-        ],
-        on_change=lambda e: refresh_table(),
-    )
-
     page.add(
         ft.Row([api_base, email, password, login_btn, token_text], wrap=True),
         ft.Row([kpi_total, kpi_paid, kpi_pending, kpi_cancel], wrap=True),
@@ -511,8 +551,7 @@ def main(page: ft.Page):
         photo_preview,
         ft.Divider(),
         ft.Text("Son Kayıtlar"),
-        tabs,
-        ft.Row([sort_dd, search_text], wrap=True),
+        ft.Row([view_dd, sort_dd, search_text], wrap=True),
         ft.Row([history_date, calendar_btn, btn_today, btn_yesterday, btn_10days], wrap=True),
         ft.Row([ft.Text("Seçili Kayıt Durumu:"), edit_status, edit_btn, manual_id], wrap=True),
         ft.Container(table, expand=True),
