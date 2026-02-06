@@ -71,6 +71,11 @@ def main(page: ft.Page):
     kpi_paid = ft.Text("Ödenen: -", size=14, weight="bold")
     kpi_pending = ft.Text("Bekleyen: -", size=14, weight="bold")
     kpi_cancel = ft.Text("İptal: -", size=14, weight="bold")
+    history_kpi_total = ft.Text("Seçili Gün Toplam: -")
+    history_kpi_paid = ft.Text("Seçili Gün Ödenen: -")
+    history_kpi_pending = ft.Text("Seçili Gün Bekleyen: -")
+    history_kpi_cancel = ft.Text("Seçili Gün İptal: -")
+    history_series = ft.Text("Gün Gün Özet: -")
 
     full_name = ft.TextField(label="İsim Soyisim", width=260)
     phone = ft.TextField(label="Telefon (opsiyonel)", width=180)
@@ -118,7 +123,7 @@ def main(page: ft.Page):
         value="today",
         on_change=lambda e: refresh_table(),
     )
-    history_date = ft.TextField(label="Geçmiş Tarih (YYYY-AA-GG)", width=190, on_change=lambda e: (view_dd.__setattr__("value","history"), refresh_table()))
+    history_date = ft.TextField(label="Geçmiş Tarih (YYYY-AA-GG)", width=190, on_change=lambda e: (view_dd.__setattr__("value","history"), refresh_table(), refresh_history_kpis()))
     search_text = ft.TextField(label="Ara (isim/ürün/telefon)", width=260, on_change=lambda e: refresh_table())
     order_date = ft.TextField(label="Kayıt Tarihi (YYYY-AA-GG)", width=180)
 
@@ -147,6 +152,7 @@ def main(page: ft.Page):
         view_dd.value = "history"
         history_date.value = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
         refresh_table()
+        refresh_history_kpis()
 
     btn_today = ft.OutlinedButton("Bugün", on_click=lambda e: _set_history(0))
     btn_yesterday = ft.OutlinedButton("Dün", on_click=lambda e: _set_history(1))
@@ -201,6 +207,39 @@ def main(page: ft.Page):
             kpi_paid.value = f"Ödenen: {s.get('paid','-')}"
             kpi_pending.value = f"Bekleyen: {s.get('pending','-')}"
             kpi_cancel.value = f"İptal: {s.get('cancelled','-')}"
+        except:
+            pass
+        page.update()
+
+    def refresh_history_kpis():
+        tok = token_holder["token"]
+        if not tok:
+            return
+        date_str = (history_date.value or "").strip()
+        if not date_str:
+            history_kpi_total.value = "Seçili Gün Toplam: -"
+            history_kpi_paid.value = "Seçili Gün Ödenen: -"
+            history_kpi_pending.value = "Seçili Gün Bekleyen: -"
+            history_kpi_cancel.value = "Seçili Gün İptal: -"
+            history_series.value = "Gün Gün Özet: -"
+            page.update()
+            return
+        try:
+            r = requests.get(api_base.value.strip() + f"/stats/by-date?date={date_str}", headers={"Authorization": f"Bearer {tok}"}, timeout=10)
+            s = r.json()
+            history_kpi_total.value = f"Seçili Gün Toplam: {s.get('total','-')}"
+            history_kpi_paid.value = f"Seçili Gün Ödenen: {s.get('paid','-')}"
+            history_kpi_pending.value = f"Seçili Gün Bekleyen: {s.get('pending','-')}"
+            history_kpi_cancel.value = f"Seçili Gün İptal: {s.get('cancelled','-')}"
+        except:
+            pass
+        try:
+            r2 = requests.get(api_base.value.strip() + "/stats/daily-series?days=10", headers={"Authorization": f"Bearer {tok}"}, timeout=10)
+            arr = r2.json()
+            lines = []
+            for d in arr:
+                lines.append(f"{d.get('date')}: {d.get('total',0)}")
+            history_series.value = "Gün Gün Özet: " + " | ".join(lines)
         except:
             pass
         page.update()
@@ -618,6 +657,8 @@ def main(page: ft.Page):
         ft.Text("Son Kayıtlar"),
         ft.Row([view_dd, sort_dd, search_text], wrap=True),
         ft.Row([history_date, calendar_btn, btn_today, btn_yesterday, btn_10days], wrap=True),
+        ft.Row([history_kpi_total, history_kpi_paid, history_kpi_pending, history_kpi_cancel], wrap=True),
+        history_series,
         ft.Row([ft.Text("Seçili Kayıt Durumu:"), edit_status, edit_btn, manual_id, manual_phone, phone_btn, wa_bulk_btn], wrap=True),
         ft.Container(table, expand=True),
     )
