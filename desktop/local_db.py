@@ -49,9 +49,36 @@ def add_order(row: dict):
         con.commit()
 
 def list_orders(limit=200):
+    return list_orders_filtered(limit=limit)
+
+
+def list_orders_filtered(limit=200, date_str: str | None = None, sort: str = "date_desc", search: str = ""):
+    order_by = "created_at DESC"
+    if sort == "date_asc":
+        order_by = "created_at ASC"
+    elif sort == "name_asc":
+        order_by = "full_name COLLATE NOCASE ASC"
+    elif sort == "name_desc":
+        order_by = "full_name COLLATE NOCASE DESC"
+
+    where = []
+    params = []
+    if date_str:
+        where.append("created_at LIKE ?")
+        params.append(f"{date_str}%")
+
+    if search:
+        where.append("(full_name LIKE ? OR product LIKE ? OR phone LIKE ?)")
+        like = f"%{search}%"
+        params.extend([like, like, like])
+
+    where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+    sql = f"SELECT * FROM orders {where_sql} ORDER BY {order_by} LIMIT ?"
+    params.append(limit)
+
     with sqlite3.connect(DB_PATH) as con:
         con.row_factory = sqlite3.Row
-        rows = con.execute("SELECT * FROM orders ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        rows = con.execute(sql, tuple(params)).fetchall()
         return [dict(r) for r in rows]
 
 def pending_sync():

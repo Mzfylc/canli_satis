@@ -16,9 +16,10 @@ import sys
 import time
 import shutil
 import platform
+from datetime import timedelta
 from datetime import datetime
 
-from local_db import init_db, add_order, list_orders, pending_sync, mark_synced, count_unsynced, update_status_local, APP_DIR, DB_PATH
+from local_db import init_db, add_order, list_orders, list_orders_filtered, pending_sync, mark_synced, count_unsynced, update_status_local, APP_DIR, DB_PATH
 from sync import login, push_one
 
 CLIENT_ID = str(uuid.uuid4())
@@ -90,6 +91,31 @@ def main(page: ft.Page):
 
     range_start = ft.TextField(label="Başlangıç (YYYY-AA-GG)", width=190)
     range_end = ft.TextField(label="Bitiş (YYYY-AA-GG)", width=190)
+
+    # Görünüm / sıralama
+    sort_dd = ft.Dropdown(
+        label="Sıralama",
+        width=190,
+        options=[
+            ft.dropdown.Option("date_desc", "Tarih (Yeni→Eski)"),
+            ft.dropdown.Option("date_asc", "Tarih (Eski→Yeni)"),
+            ft.dropdown.Option("name_asc", "İsim (A→Z)"),
+            ft.dropdown.Option("name_desc", "İsim (Z→A)"),
+        ],
+        value="date_desc",
+        on_change=lambda e: refresh_table(),
+    )
+
+    history_date = ft.TextField(label="Geçmiş Tarih (YYYY-AA-GG)", width=190, on_change=lambda e: refresh_table())
+    search_text = ft.TextField(label="Ara (isim/ürün/telefon)", width=260, on_change=lambda e: refresh_table())
+
+    def _set_history(days_ago: int):
+        history_date.value = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+        refresh_table()
+
+    btn_today = ft.OutlinedButton("Bugün", on_click=lambda e: _set_history(0))
+    btn_yesterday = ft.OutlinedButton("Dün", on_click=lambda e: _set_history(1))
+    btn_10days = ft.OutlinedButton("10 Gün Önce", on_click=lambda e: _set_history(10))
 
     # Seçili kayıt için durum değiştirme
     selected_id = {"local_id": None}
@@ -165,7 +191,14 @@ def main(page: ft.Page):
                 return ft.DataCell(ft.Image(src=path, width=60, height=40, fit="contain"))
             return ft.DataCell(ft.Text("-"))
 
-        rows = list_orders(300)
+        active_tab = tabs.selected_index if tabs else 0
+        date_filter = None
+        if active_tab == 0:
+            date_filter = datetime.now().strftime("%Y-%m-%d")
+        else:
+            date_filter = (history_date.value or "").strip() or None
+
+        rows = list_orders_filtered(300, date_filter, sort_dd.value, (search_text.value or "").strip())
         table.rows.clear()
 
         def on_row_select(local_id, st):
@@ -436,6 +469,15 @@ def main(page: ft.Page):
     monthly_btn = ft.OutlinedButton("Aylık PDF", on_click=report_monthly)
     range_btn = ft.OutlinedButton("Aralık PDF", on_click=report_range)
 
+    tabs = ft.Tabs(
+        selected_index=0,
+        tabs=[
+            ft.Tab(text="Bugün"),
+            ft.Tab(text="Geçmiş"),
+        ],
+        on_change=lambda e: refresh_table(),
+    )
+
     page.add(
         ft.Row([api_base, email, password, login_btn, token_text], wrap=True),
         ft.Row([kpi_total, kpi_paid, kpi_pending, kpi_cancel], wrap=True),
@@ -448,6 +490,9 @@ def main(page: ft.Page):
         photo_preview,
         ft.Divider(),
         ft.Text("Son Kayıtlar"),
+        tabs,
+        ft.Row([sort_dd, search_text], wrap=True),
+        ft.Row([history_date, btn_today, btn_yesterday, btn_10days], wrap=True),
         ft.Row([ft.Text("Seçili Kayıt Durumu:"), edit_status, edit_btn, manual_id], wrap=True),
         ft.Container(table, expand=True),
     )
