@@ -20,7 +20,7 @@ from urllib.parse import quote
 from datetime import timedelta
 from datetime import datetime
 
-from local_db import init_db, add_order, list_orders, list_orders_filtered, pending_sync, mark_synced, count_unsynced, update_status_local, APP_DIR, DB_PATH
+from local_db import init_db, add_order, list_orders, list_orders_filtered, pending_sync, mark_synced, count_unsynced, update_status_local, update_phone_local, APP_DIR, DB_PATH
 from sync import login, push_one
 
 CLIENT_ID = str(uuid.uuid4())
@@ -118,8 +118,9 @@ def main(page: ft.Page):
         value="today",
         on_change=lambda e: refresh_table(),
     )
-    history_date = ft.TextField(label="Geçmiş Tarih (YYYY-AA-GG)", width=190, on_change=lambda e: refresh_table())
+    history_date = ft.TextField(label="Geçmiş Tarih (YYYY-AA-GG)", width=190, on_change=lambda e: (view_dd.__setattr__("value","history"), refresh_table()))
     search_text = ft.TextField(label="Ara (isim/ürün/telefon)", width=260, on_change=lambda e: refresh_table())
+    order_date = ft.TextField(label="Kayıt Tarihi (YYYY-AA-GG)", width=180)
 
     # Takvim (DatePicker) - destek yoksa fallback manuel tarih
     date_picker = ft.DatePicker()
@@ -143,6 +144,7 @@ def main(page: ft.Page):
     calendar_btn = ft.OutlinedButton("Takvim", on_click=open_calendar)
 
     def _set_history(days_ago: int):
+        view_dd.value = "history"
         history_date.value = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
         refresh_table()
 
@@ -158,6 +160,7 @@ def main(page: ft.Page):
         width=140,
         visible=platform.system().lower() == "windows",
     )
+    manual_phone = ft.TextField(label="Telefon (Düzenle)", width=180, visible=platform.system().lower() == "windows")
     edit_status = ft.Dropdown(
         label="Seçili Kayıt Durumu",
         width=220,
@@ -365,6 +368,10 @@ def main(page: ft.Page):
             except Exception as ex:
                 print("PHOTO_SAVE_ERR:", ex)
 
+        created_at = None
+        if (order_date.value or "").strip():
+            created_at = order_date.value.strip() + "T12:00:00"
+
         add_order(
             {
                 "full_name": full_name.value.strip(),
@@ -376,6 +383,7 @@ def main(page: ft.Page):
                 "photo_path": saved_photo,
                 "client_id": CLIENT_ID,
                 "client_order_id": str(uuid.uuid4()),
+                "created_at": created_at,
             }
         )
 
@@ -385,6 +393,7 @@ def main(page: ft.Page):
         price.value = ""
         status.value = "pending"
         note.value = ""
+        order_date.value = ""
         photo_path.value = ""
         photo_preview.src = None
         photo_preview.visible = False
@@ -405,6 +414,23 @@ def main(page: ft.Page):
         new_status = edit_status.value
         update_status_local(lid, new_status)   # local değiş
         try_sync()                             # server’a anında yolla (upsert)
+        refresh_kpis()
+        refresh_table()
+
+    def update_selected_phone(e):
+        lid = selected_id["local_id"]
+        if not lid and manual_id.visible:
+            try:
+                lid = int((manual_id.value or "").strip())
+            except Exception:
+                lid = None
+        if not lid:
+            return
+        phone_val = (manual_phone.value or "").strip()
+        if not phone_val:
+            return
+        update_phone_local(lid, phone_val)
+        try_sync()
         refresh_kpis()
         refresh_table()
 
@@ -536,6 +562,7 @@ def main(page: ft.Page):
     save_btn = ft.ElevatedButton("Kaydet", on_click=save_order)
     sync_btn = ft.OutlinedButton("Senkronla", on_click=lambda e: (try_sync(), refresh_kpis(), refresh_table()))
     edit_btn.on_click = update_selected_status
+    phone_btn = ft.OutlinedButton("Telefonu Güncelle", on_click=update_selected_phone, visible=platform.system().lower()=="windows")
 
     daily_btn = ft.OutlinedButton("Günlük PDF", on_click=report_daily)
     weekly_btn = ft.OutlinedButton("Haftalık PDF", on_click=report_weekly)
@@ -548,7 +575,7 @@ def main(page: ft.Page):
         ft.Row([unsynced_text, sync_btn, daily_btn, weekly_btn, monthly_btn], wrap=True),
         ft.Row([range_start, range_end, range_btn], wrap=True),
         ft.Divider(),
-        ft.Row([full_name, phone, product, price, status, photo_btn, save_btn], wrap=True),
+        ft.Row([full_name, phone, product, price, status, order_date, photo_btn, save_btn], wrap=True),
         photo_path,
         ft.Row([note], wrap=True),
         photo_preview,
@@ -556,7 +583,7 @@ def main(page: ft.Page):
         ft.Text("Son Kayıtlar"),
         ft.Row([view_dd, sort_dd, search_text], wrap=True),
         ft.Row([history_date, calendar_btn, btn_today, btn_yesterday, btn_10days], wrap=True),
-        ft.Row([ft.Text("Seçili Kayıt Durumu:"), edit_status, edit_btn, manual_id], wrap=True),
+        ft.Row([ft.Text("Seçili Kayıt Durumu:"), edit_status, edit_btn, manual_id, manual_phone, phone_btn], wrap=True),
         ft.Container(table, expand=True),
     )
 

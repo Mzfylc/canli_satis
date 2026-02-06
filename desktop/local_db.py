@@ -36,11 +36,12 @@ def init_db():
 
 def add_order(row: dict):
     with sqlite3.connect(DB_PATH) as con:
+        created_at = row.get("created_at") or datetime.now().isoformat(timespec="seconds")
         con.execute("""
         INSERT INTO orders(created_at, full_name, phone, product, price, status, note, photo_path, client_id, client_order_id, synced)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
         """, (
-            datetime.now().isoformat(timespec="seconds"),
+            created_at,
             row["full_name"], row["phone"], row["product"],
             float(row["price"]), row["status"], row.get("note",""),
             row.get("photo_path",""),
@@ -101,6 +102,12 @@ def count_unsynced() -> int:
 def update_status_local(local_id: int, status: str):
     with sqlite3.connect(DB_PATH) as con:
         con.execute("UPDATE orders SET status=?, synced=0 WHERE id=?", (status, local_id))
+        con.commit()
+
+
+def update_phone_local(local_id: int, phone: str):
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute("UPDATE orders SET phone=?, synced=0 WHERE id=?", (phone, local_id))
         con.commit()
 
 
