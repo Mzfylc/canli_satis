@@ -343,6 +343,9 @@ def main(page: ft.Page):
                 )
             table.rows.append(row)
 
+        if view_dd.value == "history":
+            refresh_history_kpis()
+
         uns = count_unsynced()
         unsynced_text.value = f"Bekleyen senkron: {uns}"
         unsynced_text.color = "green" if uns == 0 else "orange"
@@ -355,6 +358,7 @@ def main(page: ft.Page):
             token_text.value = "Bulut: Bağlı ✅"
             token_text.color = "green"
             refresh_kpis()
+            refresh_history_kpis()
         except:
             token_holder["token"] = None
             token_text.value = "Bulut: Bağlanamadı"
