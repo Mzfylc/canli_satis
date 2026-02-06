@@ -109,6 +109,27 @@ def main(page: ft.Page):
     history_date = ft.TextField(label="Geçmiş Tarih (YYYY-AA-GG)", width=190, on_change=lambda e: refresh_table())
     search_text = ft.TextField(label="Ara (isim/ürün/telefon)", width=260, on_change=lambda e: refresh_table())
 
+    # Takvim (DatePicker) - destek yoksa fallback manuel tarih
+    date_picker = ft.DatePicker()
+    page.overlay.append(date_picker)
+
+    def _on_date_picked(e):
+        if date_picker.value:
+            history_date.value = date_picker.value.strftime("%Y-%m-%d")
+            refresh_table()
+            page.update()
+
+    date_picker.on_change = _on_date_picked
+
+    def open_calendar(e):
+        try:
+            date_picker.open = True
+            page.update()
+        except Exception:
+            pass
+
+    calendar_btn = ft.OutlinedButton("Takvim", on_click=open_calendar)
+
     def _set_history(days_ago: int):
         history_date.value = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
         refresh_table()
@@ -492,7 +513,7 @@ def main(page: ft.Page):
         ft.Text("Son Kayıtlar"),
         tabs,
         ft.Row([sort_dd, search_text], wrap=True),
-        ft.Row([history_date, btn_today, btn_yesterday, btn_10days], wrap=True),
+        ft.Row([history_date, calendar_btn, btn_today, btn_yesterday, btn_10days], wrap=True),
         ft.Row([ft.Text("Seçili Kayıt Durumu:"), edit_status, edit_btn, manual_id], wrap=True),
         ft.Container(table, expand=True),
     )
