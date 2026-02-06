@@ -113,6 +113,7 @@ def main(page: ft.Page):
         options=[
             ft.dropdown.Option("today", "Bugün"),
             ft.dropdown.Option("history", "Geçmiş Tarih"),
+            ft.dropdown.Option("all", "Tümü"),
         ],
         value="today",
         on_change=lambda e: refresh_table(),
@@ -259,6 +260,8 @@ def main(page: ft.Page):
             date_filter = datetime.now().strftime("%Y-%m-%d")
         elif view_dd.value == "history":
             date_filter = (history_date.value or "").strip() or None
+        elif view_dd.value == "all":
+            date_filter = None
 
         rows = list_orders_filtered(300, date_filter, sort_dd.value, (search_text.value or "").strip())
         table.rows.clear()
