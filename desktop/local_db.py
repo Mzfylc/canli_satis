@@ -111,6 +111,23 @@ def update_phone_local(local_id: int, phone: str):
         con.commit()
 
 
+def get_order_by_id(local_id: int):
+    with sqlite3.connect(DB_PATH) as con:
+        con.row_factory = sqlite3.Row
+        row = con.execute("SELECT * FROM orders WHERE id=?", (local_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def list_pending_by_phone(phone: str):
+    with sqlite3.connect(DB_PATH) as con:
+        con.row_factory = sqlite3.Row
+        rows = con.execute(
+            "SELECT * FROM orders WHERE status='pending' AND phone=? ORDER BY created_at ASC",
+            (phone,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 def update_status(order_id: int, status: str):
     con = _connect()
     try:

@@ -20,7 +20,7 @@ from urllib.parse import quote
 from datetime import timedelta
 from datetime import datetime
 
-from local_db import init_db, add_order, list_orders, list_orders_filtered, pending_sync, mark_synced, count_unsynced, update_status_local, update_phone_local, APP_DIR, DB_PATH
+from local_db import init_db, add_order, list_orders, list_orders_filtered, pending_sync, mark_synced, count_unsynced, update_status_local, update_phone_local, get_order_by_id, list_pending_by_phone, APP_DIR, DB_PATH
 from sync import login, push_one
 
 CLIENT_ID = str(uuid.uuid4())
@@ -434,6 +434,40 @@ def main(page: ft.Page):
         refresh_kpis()
         refresh_table()
 
+    def send_whatsapp_bulk(e):
+        # Önce manuel telefon; yoksa seçili kayıttan al
+        phone_val = (manual_phone.value or "").strip()
+        if not phone_val:
+            lid = selected_id["local_id"]
+            if not lid and manual_id.visible:
+                try:
+                    lid = int((manual_id.value or "").strip())
+                except Exception:
+                    lid = None
+            if lid:
+                row = get_order_by_id(lid)
+                phone_val = (row.get("phone") if row else "") or ""
+        if not phone_val:
+            return
+
+        pendings = list_pending_by_phone(phone_val)
+        if not pendings:
+            msg = "Merhaba, bekleyen ödemeniz bulunmamaktadır."
+        else:
+            lines = []
+            total = 0.0
+            name = pendings[0].get("full_name", "")
+            for r in pendings:
+                total += float(r.get("price", 0))
+                lines.append(f"- {r['created_at'][:10]} / {r['product']} / {float(r['price']):.2f} TL")
+            msg = "Merhaba"
+            if name:
+                msg += f" {name}"
+            msg += ", bekleyen ödemeleriniz:\n" + "\n".join(lines) + f"\nToplam: {total:.2f} TL"
+
+        url = f"https://wa.me/{_normalize_phone(phone_val)}?text={quote(msg)}"
+        webbrowser.open(url)
+
     def run_report(path):
         # Raporu API üzerinden aç (uzak sunucu için güvenli)
         try:
@@ -563,6 +597,7 @@ def main(page: ft.Page):
     sync_btn = ft.OutlinedButton("Senkronla", on_click=lambda e: (try_sync(), refresh_kpis(), refresh_table()))
     edit_btn.on_click = update_selected_status
     phone_btn = ft.OutlinedButton("Telefonu Güncelle", on_click=update_selected_phone, visible=platform.system().lower()=="windows")
+    wa_bulk_btn = ft.OutlinedButton("WhatsApp (Bekleyen)", on_click=send_whatsapp_bulk, visible=platform.system().lower()=="windows")
 
     daily_btn = ft.OutlinedButton("Günlük PDF", on_click=report_daily)
     weekly_btn = ft.OutlinedButton("Haftalık PDF", on_click=report_weekly)
@@ -583,7 +618,7 @@ def main(page: ft.Page):
         ft.Text("Son Kayıtlar"),
         ft.Row([view_dd, sort_dd, search_text], wrap=True),
         ft.Row([history_date, calendar_btn, btn_today, btn_yesterday, btn_10days], wrap=True),
-        ft.Row([ft.Text("Seçili Kayıt Durumu:"), edit_status, edit_btn, manual_id, manual_phone, phone_btn], wrap=True),
+        ft.Row([ft.Text("Seçili Kayıt Durumu:"), edit_status, edit_btn, manual_id, manual_phone, phone_btn, wa_bulk_btn], wrap=True),
         ft.Container(table, expand=True),
     )
 
