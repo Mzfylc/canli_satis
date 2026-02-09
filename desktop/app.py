@@ -112,6 +112,17 @@ def main(page: ft.Page):
         on_change=lambda e: refresh_table(),
     )
 
+    data_source = ft.Dropdown(
+        label="Kaynak",
+        width=140,
+        options=[
+            ft.dropdown.Option("local", "Lokal"),
+            ft.dropdown.Option("cloud", "Bulut"),
+        ],
+        value="local",
+        on_change=lambda e: refresh_table(),
+    )
+
     view_dd = ft.Dropdown(
         label="Görünüm",
         width=160,
@@ -305,7 +316,29 @@ def main(page: ft.Page):
         elif view_dd.value == "all":
             date_filter = None
 
-        rows = list_orders_filtered(300, date_filter, sort_dd.value, (search_text.value or "").strip())
+        rows = []
+        if data_source.value == "cloud":
+            tok = token_holder["token"]
+            if tok:
+                try:
+                    params = {
+                        "date": date_filter,
+                        "sort": sort_dd.value,
+                        "q": (search_text.value or "").strip() or None,
+                        "limit": 300,
+                    }
+                    r = requests.get(
+                        api_base.value.strip() + "/orders",
+                        params=params,
+                        headers={"Authorization": f"Bearer {tok}"},
+                        timeout=10,
+                    )
+                    if r.status_code == 200:
+                        rows = r.json()
+                except Exception:
+                    rows = []
+        else:
+            rows = list_orders_filtered(300, date_filter, sort_dd.value, (search_text.value or "").strip())
         table.rows.clear()
 
         def on_row_select(local_id, st):
@@ -659,7 +692,7 @@ def main(page: ft.Page):
         photo_preview,
         ft.Divider(),
         ft.Text("Son Kayıtlar"),
-        ft.Row([view_dd, sort_dd, search_text], wrap=True),
+        ft.Row([data_source, view_dd, sort_dd, search_text], wrap=True),
         ft.Row([history_date, calendar_btn, btn_today, btn_yesterday, btn_10days], wrap=True),
         ft.Row([history_kpi_total, history_kpi_paid, history_kpi_pending, history_kpi_cancel], wrap=True),
         history_series,

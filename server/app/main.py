@@ -124,6 +124,29 @@ def stats_today(user: str = Depends(require_user), db: Session = Depends(get_db)
     return summary
 
 
+@app.get("/stats/by-date")
+def stats_by_date(date: str, user: str = Depends(require_user), db: Session = Depends(get_db)):
+    # date: YYYY-MM-DD
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    summary, _ = compute_daily(db, date)
+    return summary
+
+
+@app.get("/stats/daily-series")
+def stats_daily_series(days: int = 10, user: str = Depends(require_user), db: Session = Depends(get_db)):
+    if days < 1 or days > 60:
+        raise HTTPException(status_code=400, detail="days must be between 1 and 60")
+    out = []
+    for i in range(days - 1, -1, -1):
+        day = (datetime.now().date() - timedelta(days=i)).strftime("%Y-%m-%d")
+        summary, _ = compute_daily(db, day)
+        out.append({"date": day, **summary})
+    return out
+
+
 @app.post("/reports/weekly")
 def report_weekly(user: str = Depends(require_user), db: Session = Depends(get_db)):
     end = datetime.now().date()
@@ -174,3 +197,79 @@ def update_order_status(order_id: int, payload: dict, user: str = Depends(requir
     db.commit()
     db.refresh(o)
     return {"id": o.id, "status": o.status}
+
+
+@app.get("/orders/pending-by-phone")
+def pending_by_phone(phone: str, user: str = Depends(require_user), db: Session = Depends(get_db)):
+    # normalize phone digits and match by last 10 digits
+    digits = "".join([c for c in (phone or "") if c.isdigit()])
+    if len(digits) >= 10:
+        tail = digits[-10:]
+    else:
+        tail = digits
+    rows = db.query(Order).filter(Order.status == "pending").all()
+    out = []
+    for o in rows:
+        od = "".join([c for c in (o.phone or "") if c.isdigit()])
+        if tail and od.endswith(tail):
+            out.append({
+                "id": o.id,
+                "created_at": o.created_at.isoformat(),
+                "full_name": o.full_name,
+                "phone": o.phone,
+                "product": o.product,
+                "price": float(o.price),
+                "status": o.status,
+            })
+    return out
+
+
+@app.get("/orders")
+def list_orders(
+    date: str | None = None,
+    sort: str = "date_desc",
+    q: str | None = None,
+    limit: int = 300,
+    user: str = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    order_by = Order.created_at.desc()
+    if sort == "date_asc":
+        order_by = Order.created_at.asc()
+    elif sort == "name_asc":
+        order_by = Order.full_name.asc()
+    elif sort == "name_desc":
+        order_by = Order.full_name.desc()
+
+    query = db.query(Order)
+    if date:
+        try:
+            datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+        start = datetime.fromisoformat(date + "T00:00:00")
+        end = datetime.fromisoformat(date + "T23:59:59")
+        query = query.filter(Order.created_at >= start, Order.created_at <= end)
+
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            (Order.full_name.like(like)) | (Order.product.like(like)) | (Order.phone.like(like))
+        )
+
+    rows = query.order_by(order_by).limit(limit).all()
+    out = []
+    for o in rows:
+        out.append({
+            "id": o.id,
+            "created_at": o.created_at.isoformat(),
+            "full_name": o.full_name,
+            "phone": o.phone,
+            "product": o.product,
+            "price": float(o.price),
+            "status": o.status,
+            "note": o.note,
+            "photo_path": o.photo_path or "",
+            "synced": True,
+        })
+    return out
